@@ -1,6 +1,8 @@
 require 'csv'
 require 'google/apis/civicinfo_v2'
 require 'erb'
+require 'time'
+require 'date'
 
 def clean_zipcode(zipcode)
   zipcode.to_s.rjust(5,'0')[0..4]
@@ -32,6 +34,22 @@ def clean_phonenumber(number)
   end
 end
 
+def convert_time(date)
+  time = Time.strptime(date, "%D %R")
+end
+
+def average_time(times)
+  total_minutes = times.reduce(0) {|sum, time| sum += time.hour * 60 + time.min}
+  average_minutes = total_minutes / times.length
+  "#{average_minutes / 60}:#{average_minutes.remainder(60)}"
+end
+
+def highest_day(days)
+  i = 0
+  days.each_with_index {|val, index| i = index if val > days[i] }
+  Date::DAYNAMES[i  - 6]
+end
+
 def save_thank_you_letter(id, form_letter)
   Dir.mkdir('output') unless Dir.exist?('output')
 
@@ -53,6 +71,9 @@ contents = CSV.open(
 template_letter = File.read('form_letter.erb')
 erb_template = ERB.new template_letter
 
+times = Array.new
+days = Array.new
+
 contents.each do |row|
   id = row[0]
   name = row[:first_name]
@@ -61,7 +82,17 @@ contents.each do |row|
 
   phonenumber = clean_phonenumber(row[:homephone])
 
-  puts phonenumber
+  time = convert_time(row[:regdate])
+
+  times[id.to_i - 1] = time
+
+  if days[time.wday].nil?
+    days[time.wday] = 1
+  else
+    days[time.wday] += 1
+  end
+
+  puts time.day
 
   legislators = legislators_by_zipcode(zipcode)
 
@@ -71,3 +102,6 @@ contents.each do |row|
   save_thank_you_letter(id, form_letter)
 
 end
+
+puts highest_day(days)
+puts average_time(times)
